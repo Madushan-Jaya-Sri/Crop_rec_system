@@ -1,0 +1,55 @@
+.
+├── backend
+│   ├── __pycache__
+│   │   └── location_weather.cpython-311.pyc
+│   ├── app.py
+│   ├── location_weather.py
+│   ├── models
+│   │   ├── label_encoder.pkl
+│   │   └── xgboost_model.pkl
+│   └── utils
+│       ├── __pycache__
+│       │   └── soil_ranges.cpython-311.pyc
+│       └── soil_ranges.py
+├── files.txt
+├── frontend
+│   ├── README.md
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── public
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   └── robots.txt
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.js
+│   │   ├── App.test.js
+│   │   ├── components
+│   │   │   ├── CropPreferences.js
+│   │   │   ├── LandSizeInput.js
+│   │   │   ├── LoadingOverlay.js
+│   │   │   ├── LoadingSpinner.js
+│   │   │   ├── LocationInput.js
+│   │   │   ├── SoilTypeSelect.js
+│   │   │   └── WaterSupplyToggle.js
+│   │   ├── i18n.js
+│   │   ├── index.css
+│   │   ├── index.js
+│   │   ├── locales
+│   │   │   ├── en.json
+│   │   │   └── si.json
+│   │   ├── logo.svg
+│   │   ├── reportWebVitals.js
+│   │   ├── setupTests.js
+│   │   └── utils
+│   │       └── api.js
+│   └── tailwind.config.js
+├── model_training
+│   └── crop data.csv
+└── structure.txt
+
+13 directories, 40 files
