@@ -79,15 +79,16 @@ def get_coordinates_from_city(city_name, api_key):
         print(f"  Error details: {str(e)}")
         return None, None
 
-def get_weather(lat, lon, api_key):
-    print("===============================================================")
-    print(api_key)
-    print("===============================================================")
 
+import requests
+from datetime import datetime, timedelta
+import statistics
+
+def get_weather(lat, lon, api_key):
     """
-    Get weather data from API without soil type adjustments.
+    Get average weather data for the last 12 months using historical endpoint.
     """
-    print(f"\n=== Debug Point: Fetching Weather Data ===")
+    print(f"\n=== Debug Point: Fetching Historical Weather Data ===")
     print(f"Location coordinates: ({lat}, {lon})")
 
     if not all([lat, lon, api_key]):
@@ -98,51 +99,63 @@ def get_weather(lat, lon, api_key):
         return None
 
     try:
-        url = "http://api.weatherstack.com/current"
-        params = {
-            "access_key": api_key,
-            "query": f"{lat},{lon}"
-        }
+        # Calculate dates for last 12 months
+        end_date = datetime.now()
+        temperatures = []
+        humidities = []
+        rainfalls = []
         
-        print("\nMaking API request to Weatherstack...")
-        response = requests.get(url, params=params)
-        print(f"API Response Status: {response.status_code}")
-        
-        data = response.json()
-        if "error" in data:
-            print("✗ API Error:")
-            print(f"  {data['error'].get('info', 'Unknown error')}")
-            return None
+        # We'll sample one day from each month for the past 12 months
+        for month in range(12):
+            sample_date = (end_date - timedelta(days=30*month)).strftime('%Y-%m-%d')
+            
+            url = "http://api.weatherstack.com/historical"
+            params = {
+                "access_key": api_key,
+                "query": f"{lat},{lon}",
+                "historical_date": sample_date
+            }
+            
+            print(f"\nFetching data for {sample_date}...")
+            response = requests.get(url, params=params)
+            print(f"API Response Status: {response.status_code}")
+            
+            data = response.json()
+            if "error" in data:
+                print("✗ API Error:")
+                print(f"  {data['error'].get('info', 'Unknown error')}")
+                continue
 
-        current_data = data.get('current', {})
-        location_data = data.get('location', {})
-        
-        print("\n✓ Weather data received:")
-        print(f"  Location: {location_data.get('name', 'Unknown')}, {location_data.get('country', 'Unknown')}")
-        
-        # Get actual weather values from API
-        weather_data = {
-            'temperature': current_data.get('temperature', 25),
-            'humidity': current_data.get('humidity', 75),
+            historical_data = data.get('historical', {}).get(sample_date, {})
+            if historical_data:
+                temperatures.append(historical_data.get('avgtemp', 0))
+                humidities.append(historical_data.get('humidity', 0))
+                rainfalls.append(historical_data.get('precip', 0))
 
-            'rainfall': current_data.get('precip', 0) * 25.4  # Convert inches to mm
-        }
-        print(current_data.get('precip', 0))  # Convert daily to monthly
+        # Calculate averages if we have data
+        if temperatures or humidities or rainfalls:
+            weather_data = {
+                'temperature': round(statistics.mean(temperatures) if temperatures else 25, 2),
+                'humidity': round(statistics.mean(humidities) if humidities else 75, 2),
+                'rainfall': round(statistics.mean(rainfalls) * 30 if rainfalls else 200, 2)  # Multiply by 30 for monthly average
+            }
+            
+            print("\n✓ Historical averages calculated:")
+            print(f"  Average Temperature: {weather_data['temperature']}°C")
+            print(f"  Average Humidity: {weather_data['humidity']}%")
+            print(f"  Average Monthly Rainfall: {weather_data['rainfall']}mm")
+            
+            return weather_data
 
-        print("\nWeather values:")
-        print(f"  Temperature: {weather_data['temperature']}°C")
-        print(f"  Humidity: {weather_data['humidity']}%")
-        print(f"  Monthly Rainfall: {weather_data['rainfall']} mm")
-        
-        return weather_data
+        # If no historical data is available, return error message
+        print("\n✗ No historical weather data available for the specified location")
+        raise ValueError("Unable to retrieve historical weather data. Please check your API key and location coordinates.")
 
     except Exception as e:
         print("✗ Weather API error:")
         print(f"  Error details: {str(e)}")
-        # Return default values if API fails
-        return {
-            'temperature': 25,
-            'humidity': 75,
-            'rainfall': 200.0
-        }
-
+        # If API fails, raise an exception with error details
+        print("\n✗ Failed to retrieve weather data from the API")
+        raise Exception(f"Weather API error: {str(e)}. Please try again later or contact support if the issue persists.")
+    
+    

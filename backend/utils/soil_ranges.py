@@ -1,49 +1,43 @@
-# In soil_ranges.py
-SOIL_RANGES = {
+# Soil values typical for Sri Lankan agricultural soils
+SOIL_VALUES = {
     'clay': {
-        'N': (60, 95),
-        'P': (35, 55),
-        'K': (35, 45),
-        'ph': (6.0, 7.5)
+        'N': 85,  # High N content typical in Sri Lankan clay soils
+        'P': 45,  # Moderate P level
+        'K': 40,  # Moderate K level
+        'ph': 6.8 # Slightly acidic to neutral, common in wet zone clay soils
     },
     'loam': {
-        'N': (70, 90),
-        'P': (40, 60),
-        'K': (35, 45),
-        'ph': (6.5, 7.8)
+        'N': 80,  # Good N content, typical for loamy soils in farming areas
+        'P': 50,  # Moderate to high P content
+        'K': 42,  # Good K level
+        'ph': 7.0 # Neutral pH, ideal for most crops
     },
     'sandy': {
-        'N': (60, 85),
-        'P': (35, 50),
-        'K': (35, 42),
-        'ph': (5.7, 6.8)
+        'N': 65,  # Lower N content typical of sandy soils
+        'P': 40,  # Moderate P level
+        'K': 38,  # Moderate K level
+        'ph': 6.2 # Slightly acidic, common in coastal sandy soils
     },
     'gravel': {
-        'N': (75, 95),
-        'P': (45, 58),
-        'K': (38, 44),
-        'ph': (6.8, 7.8)
+        'N': 78,  # Moderate to high N content
+        'P': 48,  # Moderate P content
+        'K': 40,  # Moderate K level
+        'ph': 7.2 # Slightly alkaline
     },
     'slit': {
-        'N': (65, 85),
-        'P': (35, 55),
-        'K': (36, 42),
-        'ph': (6.0, 7.2)
+        'N': 70,  # Moderate N content
+        'P': 45,  # Moderate P level
+        'K': 39,  # Moderate K level
+        'ph': 6.5 # Slightly acidic to neutral
     }
 }
 
 def get_soil_values(soil_type):
     """
-    Get consistent values for soil parameters (N, P, K, pH) based on soil type.
-    Uses the middle point of ranges for consistency.
+    Get fixed values for soil parameters (N, P, K, pH) based on soil type.
+    These values are typical for Sri Lankan agricultural soils.
     """
-    if soil_type not in SOIL_RANGES:
-        raise ValueError(f"Invalid soil type: {soil_type}. Valid types are: {', '.join(SOIL_RANGES.keys())}")
+    if soil_type not in SOIL_VALUES:
+        raise ValueError(f"Invalid soil type: {soil_type}. Valid types are: {', '.join(SOIL_VALUES.keys())}")
     
-    ranges = SOIL_RANGES[soil_type]
-    return {
-        'N': round((ranges['N'][0] + ranges['N'][1]) / 2, 2),  # Use middle point
-        'P': round((ranges['P'][0] + ranges['P'][1]) / 2, 2),
-        'K': round((ranges['K'][0] + ranges['K'][1]) / 2, 2),
-        'ph': round((ranges['ph'][0] + ranges['ph'][1]) / 2, 3)
-    }
+    return SOIL_VALUES[soil_type]

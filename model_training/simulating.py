@@ -13,17 +13,30 @@ def generate_land_size(crop_type):
         # Smaller land sizes for fruits and others
         return np.random.uniform(0.1, 1.0)
 
+def generate_skewed_rainfall():
+    # Generate a random number between 0 and 1
+    r = np.random.random()
+    
+    # Apply different ranges with different probabilities
+    if r < 0.4:  # 40% chance of very low rainfall
+        return np.random.uniform(1, 10)
+    elif r < 0.7:  # 30% chance of low rainfall
+        return np.random.uniform(10, 50)
+    elif r < 0.9:  # 20% chance of moderate rainfall
+        return np.random.uniform(50, 100)
+    else:  # 10% chance of high rainfall
+        return np.random.uniform(100, 200)
+
 # Read original dataset
 df = pd.read_csv('model_training/crop data.csv')
 
 # Define the crop mapping
 crop_mapping = {
     'maize': 'Maize',
-    'chickpea': 'Green Gram',
-    'kidneybeans': 'Green Beans',
+    'chickpea': 'chickpea',
+    'kidneybeans': 'Cowpea',
     'pigeonpeas': 'Green Gram',
     'mothbeans': 'Cowpea',
-    'mungbean': 'Mungbean',
     'blackgram': 'Blackgram',
     'lentil': 'Cowpea',
     'pomegranate': 'Pomegranate',
@@ -48,6 +61,9 @@ df['label'] = df['label'].map(crop_mapping)
 # Add new columns
 # Land size based on crop type
 df['land_size'] = df['label'].apply(generate_land_size)
+
+# Generate skewed rainfall data
+df['rainfall'] = [generate_skewed_rainfall() for _ in range(len(df))]
 
 # Water supply (more likely to be Yes for certain crops)
 def generate_water_supply(row):
@@ -100,7 +116,6 @@ df['K'] = df['K'].clip(0, 205)
 df['temperature'] = df['temperature'].clip(8, 45)
 df['humidity'] = df['humidity'].clip(14, 100)
 df['ph'] = df['ph'].clip(3.5, 10)
-df['rainfall'] = df['rainfall'].clip(20, 300)
 
 # Round numerical values to reasonable decimals
 df['N'] = df['N'].round(2)
@@ -112,12 +127,12 @@ df['ph'] = df['ph'].round(2)
 df['rainfall'] = df['rainfall'].round(2)
 df['land_size'] = df['land_size'].round(3)
 
-
 df.dropna(inplace=True)
+
 # Save the updated dataset
 df.to_csv('model_training/updated_crop_data.csv', index=False)
 
-# Print some statistics to verify
+# Print statistics to verify the data
 print("\nDataset Statistics:")
 print(f"Total number of records: {len(df)}")
 print("\nCrop distribution:")
@@ -126,3 +141,8 @@ print("\nAverage land size by crop type:")
 print(df.groupby('label')['land_size'].mean().sort_values(ascending=False))
 print("\nWater supply distribution:")
 print(df['water_supply'].value_counts(normalize=True))
+print("\nRainfall distribution statistics:")
+print(f"Mean rainfall: {df['rainfall'].mean():.2f}")
+print(f"Median rainfall: {df['rainfall'].median():.2f}")
+print("\nRainfall percentiles:")
+print(df['rainfall'].describe([0.1, 0.25, 0.5, 0.75, 0.9]))

@@ -6,95 +6,30 @@ import pandas as pd
 import os
 import traceback
 import requests
-import random  # For soil ranges
 from dotenv import load_dotenv
 from location_weather import get_current_location, get_coordinates_from_city, get_weather
+from utils.soil_ranges import get_soil_values
 
-load_dotenv()
+load_dotenv(override=True)
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
 OPENCAGE_API_KEY = os.getenv('OPENCAGE_API_KEY')
 app = Flask(__name__)
 CORS(app)
 
-# Soil ranges dictionary
-SOIL_RANGES = {
-    'clay': {
-        'N': (60, 95),
-        'P': (35, 55),
-        'K': (35, 45),
-        'ph': (6.0, 7.5),
-        'temperature': (20, 25),
-        'humidity': (80, 85),
-        'rainfall': (200, 250)
-    },
-    'loam': {
-        'N': (70, 90),
-        'P': (40, 60),
-        'K': (35, 45),
-        'ph': (6.5, 7.8),
-        'temperature': (21, 26),
-        'humidity': (80, 84),
-        'rainfall': (220, 270)
-    },
-    'sandy': {
-        'N': (60, 85),
-        'P': (35, 50),
-        'K': (35, 42),
-        'ph': (5.7, 6.8),
-        'temperature': (22, 27),
-        'humidity': (80, 83),
-        'rainfall': (180, 240)
-    },
-    'gravel': {
-        'N': (75, 95),
-        'P': (45, 58),
-        'K': (38, 44),
-        'ph': (6.8, 7.8),
-        'temperature': (20, 25),
-        'humidity': (81, 84),
-        'rainfall': (230, 280)
-    },
-    'slit': {
-        'N': (65, 85),
-        'P': (35, 55),
-        'K': (36, 42),
-        'ph': (6.0, 7.2),
-        'temperature': (21, 26),
-        'humidity': (80, 83),
-        'rainfall': (200, 260)
-    }
-}
-
-# Define feature names
+# Updated feature names to match the new model
 FEATURE_NAMES = [
     'N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall',
     'land_size', 'water_supply', 'preference_cereals',
-    'preference_vegetables', 'preference_fruits'
+    'preference_vegetables', 'preference_fruits',
+    'weather_score', 'water_availability'
 ]
 
 # Get the absolute path to the models directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, 'models')
 
-def get_soil_values(soil_type):
-    """Get soil parameter values based on soil type."""
-    if soil_type not in SOIL_RANGES:
-        raise ValueError(f"Invalid soil type: {soil_type}. Valid types are: {', '.join(SOIL_RANGES.keys())}")
-    
-    ranges = SOIL_RANGES[soil_type]
-    return {
-        'N': round(random.uniform(*ranges['N']), 2),
-        'P': round(random.uniform(*ranges['P']), 2),
-        'K': round(random.uniform(*ranges['K']), 2),
-        'ph': round(random.uniform(*ranges['ph']), 3),
-        'temperature': round(random.uniform(*ranges['temperature']), 2),
-        'humidity': round(random.uniform(*ranges['humidity']), 2),
-        'rainfall': round(random.uniform(*ranges['rainfall']), 2)
-    }
-
 def load_models():
     try:
-        # Use os.path.join for platform-independent path handling
         model_path = os.path.join(MODELS_DIR, 'xgboost_model.pkl')
         scaler_path = os.path.join(MODELS_DIR, 'scaler.pkl')
         le_path = os.path.join(MODELS_DIR, 'label_encoder.pkl')
@@ -104,7 +39,6 @@ def load_models():
         print(f"Looking for scaler at: {scaler_path}")
         print(f"Looking for label encoder at: {le_path}")
         
-        # Check if files exist
         if not all(os.path.exists(path) for path in [model_path, scaler_path, le_path]):
             raise FileNotFoundError("One or more model files are missing")
 
@@ -124,17 +58,13 @@ def load_models():
         traceback.print_exc()
         raise
 
-# Make sure models directory exists
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-# Load models
 try:
     model, scaler, le = load_models()
 except Exception as e:
     print(f"Failed to load models: {str(e)}")
     raise
-
-
 
 @app.route('/api/predict', methods=['GET', 'POST', 'OPTIONS'])
 def predict():
@@ -148,7 +78,7 @@ def predict():
         print("\n=== Debug Point 1: Incoming Request Data ===")
         print("Request Data:", data)
 
-        # Get location and weather data based on user selection
+        # Get location and weather data
         print("\n=== Debug Point 2: Processing Location ===")
         if data['locationType'] == 'automatic':
             print("Getting current location automatically...")
@@ -168,15 +98,8 @@ def predict():
                 print("✗ Failed to get coordinates, using defaults")
 
         # Get weather data
-        print("\n=== Debug Point 3: Fetching Weather Data ===")
         weather_data = get_weather(lat, lon, WEATHER_API_KEY)
-        if weather_data:
-            print("✓ Weather data received:")
-            print(f"  Temperature: {weather_data['temperature']}°C")
-            print(f"  Humidity: {weather_data['humidity']}%")
-            print(f"  Rainfall: {weather_data['rainfall']}mm")
-        else:
-            print("✗ Using default weather values")
+        if not weather_data:
             weather_data = {
                 'temperature': 25,
                 'humidity': 75,
@@ -186,33 +109,32 @@ def predict():
         # Get soil values based on soil type
         try:
             soil_values = get_soil_values(data['soilType'])
-            print("\n=== Debug Point 4: Soil Values ===")
-            print("Soil Values:", soil_values)
         except Exception as e:
-            print(f"Error getting soil values: {str(e)}")
             return jsonify({
                 'status': 'error',
                 'message': f'Error with soil type: {str(e)}'
             }), 400
         
+        # Calculate additional features
+        weather_score = (weather_data['temperature'] * weather_data['humidity'] * weather_data['rainfall']) / 1000
+        water_availability = weather_data['rainfall'] * data['water_supply']
+        
         input_data = pd.DataFrame([[
-            soil_values['N'],           # From soil type
-            soil_values['P'],           # From soil type
-            soil_values['K'],           # From soil type
-            weather_data['temperature'], # From weather API
-            weather_data['humidity'],    # From weather API
-            soil_values['ph'],          # From soil type
-            weather_data['rainfall'],    # From weather API
+            soil_values['N'],
+            soil_values['P'],
+            soil_values['K'],
+            weather_data['temperature'],
+            weather_data['humidity'],
+            soil_values['ph'],
+            weather_data['rainfall'],
             data['land_size'],
             data['water_supply'],
             data['preference_cereals'],
             data['preference_vegetables'],
-            data['preference_fruits']
+            data['preference_fruits'],
+            weather_score,
+            water_availability
         ]], columns=FEATURE_NAMES)
-        
-        print("\n=== Debug Point 5: Input Data ===")
-        print("Raw input data:")
-        print(input_data)
         
         # Scale features
         features_scaled = pd.DataFrame(
@@ -220,36 +142,25 @@ def predict():
             columns=FEATURE_NAMES
         )
         
-        print("\n=== Debug Point 6: Scaled Data ===")
-        print("Scaled input data:")
-        print(features_scaled)
-        
-        # Make prediction
-        prediction = model.predict(features_scaled)
-        predicted_crop = le.inverse_transform(prediction)[0]
-        
         # Get prediction probabilities
         probabilities = model.predict_proba(features_scaled)[0]
-        confidence = float(max(probabilities) * 100)
         
-        # Get top 3 predictions
+        # Get top 3 predictions with their probabilities
         top_3_idx = np.argsort(probabilities)[-3:][::-1]
         top_3_crops = le.inverse_transform(top_3_idx)
         top_3_probas = probabilities[top_3_idx]
         
-        print("\n=== Debug Point 7: Predictions ===")
-        print(f"Predicted crop: {predicted_crop}")
-        print(f"Confidence: {confidence}%")
-        print("Top 3 predictions:", list(zip(top_3_crops, top_3_probas)))
+        # Create predictions list
+        predictions = []
+        for crop, prob in zip(top_3_crops, top_3_probas):
+            predictions.append({
+                'crop': crop,
+                'probability': float(prob * 100)
+            })
         
         response_data = {
             'status': 'success',
-            'prediction': predicted_crop,
-            'confidence': round(confidence, 2),
-            'top_3_predictions': [
-                {'crop': crop, 'probability': float(prob)} 
-                for crop, prob in zip(top_3_crops, top_3_probas)
-            ],
+            'predictions': predictions,
             'weather': {
                 'temperature': weather_data['temperature'],
                 'humidity': weather_data['humidity'],
@@ -274,8 +185,6 @@ def predict():
             'message': str(e),
             'details': traceback.format_exc()
         }), 500
-
-
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
